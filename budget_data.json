@@ -1,0 +1,165 @@
+import os
+import json
+from datetime import datetime
+
+# Check if the database exists; if not, create it with default values
+def load_budget():
+    if not os.path.exists("budget_data.json"):
+        # Initialize a new budget database
+        default_data = {"income": 0, "expenses": [], "handed_amount": 0}
+        with open("budget_data.json", "w") as file:
+            json.dump(default_data, file)
+        return default_data
+    else:
+        # Load existing database
+        with open("budget_data.json", "r") as file:
+            data = json.load(file)
+        return validate_data_structure(data)
+
+# Validate and initialize missing keys in the database
+def validate_data_structure(data):
+    if "income" not in data:
+        data["income"] = 0
+    if "expenses" not in data:
+        data["expenses"] = []
+    if "handed_amount" not in data:
+        data["handed_amount"] = 0
+    return data
+
+# Save data to a file
+def save_budget(data):
+    with open("budget_data.json", "w") as file:
+        json.dump(data, file)
+
+# Get the current date and time
+def get_current_datetime():
+    current_datetime = datetime.now()
+    formatted_date = current_datetime.strftime("%Y-%m-%d")  # YYYY-MM-DD
+    formatted_time = current_datetime.strftime("%H:%M:%S")  # HH:MM:SS
+    return formatted_date, formatted_time
+
+# Add a new expense and update handed amount, ensuring expenses do not exceed income
+def add_expense(data):
+    total_expenses = sum(expense["amount"] for expense in data["expenses"])
+    
+    if total_expenses >= data["income"]:
+        print(f"Warning: Current expenses ({total_expenses:.2f}) already exceed or match your income ({data['income']:.2f}). Cannot add more expenses.")
+        return
+
+    category = input("Enter the category of the expense (e.g., Food, Rent): ").strip()
+    try:
+        amount = float(input("Enter the amount: ").strip())
+        if amount < 0:
+            print("Amount cannot be negative. Try again.\n")
+            return
+
+        # Check if adding this expense would exceed income
+        if total_expenses + amount > data["income"]:
+            print(f"Error: Adding this expense would exceed your income. Total income: {data['income']:.2f}, Total expenses after this: {total_expenses + amount:.2f}")
+            return
+
+        # Get current date and time
+        expense_date, expense_time = get_current_datetime()
+
+        # Ensure expense has date and time fields
+        expense = {
+            "category": category,
+            "amount": amount,
+            "date": expense_date,  # Add date
+            "time": expense_time   # Add time
+        }
+
+        # Append to expenses
+        data["expenses"].append(expense)
+        data["handed_amount"] += amount
+        print(f"\nAdded Expense:\n{'Category:':<15} {category}\n{'Amount:':<15} {amount:.2f}")
+        print(f"{'Date:':<15} {expense_date}\n{'Time:':<15} {expense_time}")
+        print(f"Updated handed amount: {data['handed_amount']:.2f}\n")
+    except ValueError:
+        print("Invalid input. Please enter a valid number for the amount.\n")
+
+# Add income and optionally update handed amount
+def add_income(data):
+    try:
+        income = float(input("Enter the amount of income: ").strip())
+        if income < 0:
+            print("Income cannot be negative. Try again.\n")
+            return
+        data["income"] += income
+        print(f"\nAdded Income:\n{'Amount:':<15} {income:.2f}")
+        
+        # Get current date and time
+        income_date, income_time = get_current_datetime()
+
+        update_handed = input("Was this income handed to you directly? (yes/no): ").strip().lower()
+        if update_handed == "yes":
+            data["handed_amount"] += income
+            print(f"Updated handed amount: {data['handed_amount']:.2f}\n")
+        
+        print(f"{'Date:':<15} {income_date}\n{'Time:':<15} {income_time}")
+        
+    except ValueError:
+        print("Invalid input. Please enter a valid number for the income.\n")
+
+# View the current budget, expenses, and handed amount
+def view_budget(data):
+    total_expenses = sum(expense["amount"] for expense in data["expenses"])
+    net_remaining = data["income"] - total_expenses
+
+    # Display Budget Overview
+    print("\n--- Budget Overview ---")
+    print(f"{'Total Income:':<20} {data['income']:.2f}")
+    print(f"{'Total Expenses:':<20} {total_expenses:.2f}")
+    print(f"{'Net Remaining Budget:':<20} {net_remaining:.2f}")
+    print(f"{'Handed Amount:':<20} {data['handed_amount']:.2f}")
+    
+    # Highlight Remaining Amount
+    if net_remaining > 0:
+        print(f"\n{'Remaining Amount:':<20} {net_remaining:.2f} (You are within budget!)")
+    elif net_remaining == 0:
+        print(f"\n{'Remaining Amount:':<20} {net_remaining:.2f} (You have used all your budget.)")
+    else:
+        print(f"\n{'Remaining Amount:':<20} {net_remaining:.2f} (You have exceeded your budget!)")
+
+    # Display Expense Breakdown
+    print("\n--- Expense Breakdown ---")
+    if not data["expenses"]:
+        print("No expenses recorded yet.\n")
+    else:
+        # Display header for the expense breakdown with proper column width
+        print(f"{'Category':<20}{'Amount':<15}{'Date':<15}{'Time':<10}")
+        print("-" * 60)  # Separator line
+        
+        # Display each expense with proper alignment
+        for expense in data["expenses"]:
+            print(f"{expense['category']:<20}{expense['amount']:<15.2f}{expense['date']:<15}{expense['time']:<10}")
+    print()
+
+# Main menu
+def menu():
+    data = load_budget()
+    while True:
+        print("\n----- Budget Tracker -----")
+        print("1. Add Expense")
+        print("2. Add Income")
+        print("3. View Budget and Expenses")
+        print("4. Exit")
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+            add_expense(data)
+            save_budget(data)
+        elif choice == "2":
+            add_income(data)
+            save_budget(data)
+        elif choice == "3":
+            view_budget(data)
+        elif choice == "4":
+            print("Goodbye!")
+            save_budget(data)
+            break
+        else:
+            print("Invalid choice. Please try again.\n")
+
+# Run the program
+menu()
